@@ -61,8 +61,8 @@
   .sets-adjust{display:flex;align-items:center;gap:10px}
   .adj-btn{width:30px;height:30px;border-radius:6px;border:1px solid #2a2a2a;background:var(--bg);color:var(--text);font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .adj-count{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;min-width:20px;text-align:center}
-  .sets-hdr{display:grid;grid-template-columns:24px 1fr 80px 32px;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#444;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-  .set-row{display:grid;grid-template-columns:24px 1fr 80px 32px;gap:8px;align-items:center;margin-bottom:8px}
+  .sets-hdr{display:grid;grid-template-columns:22px 52px 1fr 1fr 30px;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#444;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+  .set-row{display:grid;grid-template-columns:22px 52px 1fr 1fr 30px;gap:8px;align-items:center;margin-bottom:8px}
   .set-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:#444;text-align:center}
   .set-target{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)}
   .reps-input{background:var(--bg);border:1px solid #2a2a2a;border-radius:6px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;padding:7px 8px;outline:none;text-align:center;width:100%}
@@ -207,7 +207,7 @@ function setSaveIndicator(state){
 // ── SPLIT with research-based rep ranges + substitutes ────────
 // Rep ranges: compounds 5-8 (strength+size), hypertrophy movements 8-12,
 // isolation 10-15, delts/calves respond to 12-20. Double progression:
-// hit the TOP of the range on ALL sets → weight goes up 2.5kg automatically.
+// hit the TOP of the range on ALL sets → weight goes up 5lb automatically.
 const DEFAULT_SPLIT={
   "Upper A":[
     {name:"Cable Crossover Mid",sets:2,reps:"10-15",subs:["Pec Dec","DB Fly","Machine Chest Press"]},
@@ -229,7 +229,7 @@ const DEFAULT_SPLIT={
   ],
   "Upper C":[
     {name:"Rear Delt Fly",sets:3,reps:"12-20",subs:["Face Pull","Reverse Pec Dec","Cable Rear Delt Fly"]},
-    {name:"Weighted Pull Up",sets:4,reps:"5-8",subs:["Lat Pulldown","Assisted Pull Up","Bodyweight Pull Up"]},
+    {name:"Weighted Pull Up",sets:4,reps:"6-10",subs:["Lat Pulldown","Assisted Pull Up","Bodyweight Pull Up"]},
     {name:"Machine Back Row",sets:3,reps:"8-12",subs:["Seated Cable Row","Barbell Row","T-Bar Row"]},
     {name:"Tricep Cross Cable Curl",sets:3,reps:"10-15",subs:["Rope Pushdown","Single Arm Pushdown"]},
     {name:"Hammer Curl",sets:3,reps:"10-15",subs:["Rope Hammer Curl","Cross Body Curl","Reverse Curl"]},
@@ -237,7 +237,7 @@ const DEFAULT_SPLIT={
     {name:"Low Cable Cross",sets:3,reps:"10-15",subs:["Incline DB Fly","Incline Press","Pec Dec"]},
   ],
   "Lower A":[
-    {name:"Back Squat",sets:4,reps:"5-8",subs:["Hack Squat","Leg Press","Goblet Squat","Smith Squat"]},
+    {name:"Back Squat",sets:4,reps:"6-10",subs:["Hack Squat","Leg Press","Goblet Squat","Smith Squat"]},
     {name:"Back Squat with Box",sets:3,reps:"6-8",subs:["Pause Squat","Hack Squat","Leg Press"]},
     {name:"RDL",sets:4,reps:"8-12",subs:["Stiff Leg Deadlift","Good Morning","45° Back Extension"]},
     {name:"Calf Raise",sets:4,reps:"12-20",subs:["Seated Calf Raise","Leg Press Calf Raise","Single Leg Calf Raise"]},
@@ -306,7 +306,7 @@ function archiveWeek(){
     (split[day]||[]).forEach(ex=>{
       const ed=(workoutData[day]||{})[ex.name];
       if(ed&&ed.sets&&ed.sets.some(s=>s.done)){
-        exs.push({name:ex.name,weight:ed.weight||0,setsDone:ed.sets.filter(s=>s.done).length,totalSets:ex.sets,allHit:ed.sets.every(s=>s.done)});
+        exs.push({name:ex.name,weight:topWeight(ed)||0,setsDone:ed.sets.filter(s=>s.done).length,totalSets:ex.sets,allHit:ed.sets.every(s=>s.done)});
       }
     });
     if(exs.length>0)entry.days.push({day,exercises:exs});
@@ -321,7 +321,7 @@ function resetAllSets(){
     if(!workoutData[day])workoutData[day]={};
     (split[day]||[]).forEach(ex=>{
       if(workoutData[day][ex.name]){
-        workoutData[day][ex.name].sets=makeSets(ex.sets);
+        workoutData[day][ex.name].sets=workoutData[day][ex.name].sets.map(s=>({weight:s.weight||'',reps:'',done:false}));
         workoutData[day][ex.name].progressedThisWeek=false;
       }
     });
@@ -334,7 +334,8 @@ function topOfRange(reps){
   return parseInt(parts[parts.length-1])||12;
 }
 function evaluateProgression(day){
-  // If ALL sets done AND every set's reps >= top of range → +2.5kg now
+  // Double progression: ALL sets done AND every set's reps >= top of range
+  // → each set's weight auto-bumps +5lb for next session
   const progressed=[];
   (split[day]||[]).forEach(ex=>{
     const ed=(workoutData[day]||{})[ex.name];
@@ -343,8 +344,10 @@ function evaluateProgression(day){
     if(!allDone)return;
     const top=topOfRange(ex.reps);
     const allTopped=ed.sets.every(s=>parseInt(s.reps||0)>=top);
-    if(allTopped&&ed.weight){
-      ed.weight=(parseFloat(ed.weight)+2.5).toFixed(1);
+    if(allTopped&&ed.sets.some(s=>parseFloat(s.weight)>0)){
+      ed.sets.forEach(s=>{
+        if(parseFloat(s.weight)>0)s.weight=String(parseFloat(s.weight)+5);
+      });
       ed.progressedThisWeek=true;
       progressed.push(ex.name);
     }
@@ -408,12 +411,21 @@ function coachRecommendation(){
 }
 
 // ── DATA ──────────────────────────────────────────────────────
-function makeSets(n){return Array.from({length:n},()=>({reps:'',done:false}));}
+function makeSets(n,w){return Array.from({length:n},()=>({weight:w||'',reps:'',done:false}));}
 function getExData(day,name,numSets){
   if(!workoutData[day])workoutData[day]={};
-  if(!workoutData[day][name])workoutData[day][name]={weight:'',sets:makeSets(numSets),history:[]};
+  if(!workoutData[day][name])workoutData[day][name]={sets:makeSets(numSets),history:[]};
   const ed=workoutData[day][name];
-  while(ed.sets.length<numSets)ed.sets.push({reps:'',done:false});
+  // MIGRATION: old format had one ed.weight — copy it into every set
+  if(ed.weight!==undefined){
+    ed.sets.forEach(s=>{if(s.weight===undefined||s.weight==='')s.weight=ed.weight;});
+    delete ed.weight;
+  }
+  ed.sets.forEach(s=>{if(s.weight===undefined)s.weight='';});
+  while(ed.sets.length<numSets){
+    const lastW=ed.sets.length>0?ed.sets[ed.sets.length-1].weight:'';
+    ed.sets.push({weight:lastW,reps:'',done:false});
+  }
   if(ed.sets.length>numSets)ed.sets=ed.sets.slice(0,numSets);
   return ed;
 }
@@ -515,23 +527,18 @@ function renderWorkout(){
         <div class="card-header" onclick="toggleCard(${i},'${esc(ex.name)}')">
           <div style="flex:1;min-width:0">
             <div class="card-name" style="color:${allDone?'var(--green)':'var(--text)'}">${allDone?'✓ ':''}${ex.name}</div>
-            <div class="card-meta">${ex.sets} × ${ex.reps} · hit ${top}s on all sets → auto +2.5kg</div>
+            <div class="card-meta">${ex.sets} × ${ex.reps} · hit ${top} reps on all sets → +5lb next time</div>
           </div>
           <div class="card-right">
-            ${ed.weight?`<span class="wt-badge">${ed.weight}kg</span>`:''}
+            ${topWeight(ed)?`<span class="wt-badge">${topWeight(ed)}lb</span>`:''}
             <button class="del-btn" onclick="event.stopPropagation();deleteEx(${i})">✕</button>
             <span class="chevron">▼</span>
           </div>
         </div>
         <div class="card-body">
           <div class="prog-bar"><div class="prog-fill" style="width:${ex.sets>0?(setsDone/ex.sets)*100:0}%"></div></div>
-          ${ed.progressedThisWeek?`<div class="prog-hint"><span style="font-size:16px">🔺</span><span class="prog-hint-text">+2.5kg — you topped the rep range on all sets!</span></div>`:''}
+          ${ed.progressedThisWeek?`<div class="prog-hint"><span style="font-size:16px">🔺</span><span class="prog-hint-text">+5lb loaded on every set — you topped the rep range!</span></div>`:''}
           <div class="row-flex">
-            <div>
-              <div class="input-label">Weight (kg)</div>
-              <input class="weight-input" type="number" step="0.5" value="${ed.weight||''}" placeholder="0"
-                oninput="updateWeight('${esc(ex.name)}',this.value)">
-            </div>
             <div>
               <div class="input-label">Sets</div>
               <div class="sets-adjust">
@@ -541,11 +548,13 @@ function renderWorkout(){
               </div>
             </div>
           </div>
-          <div class="sets-hdr"><div>#</div><div>TARGET</div><div style="text-align:center">REPS</div><div style="text-align:center">✓</div></div>
+          <div class="sets-hdr"><div>#</div><div>TARGET</div><div style="text-align:center">LBS</div><div style="text-align:center">REPS</div><div style="text-align:center">✓</div></div>
           ${ed.sets.map((set,si)=>`
             <div class="set-row">
               <div class="set-num">${si+1}</div>
               <div class="set-target">${ex.reps}</div>
+              <input class="reps-input" type="number" step="2.5" value="${set.weight||''}" placeholder="lb"
+                oninput="updateSetWeight('${esc(ex.name)}',${si},this.value)">
               <input class="reps-input" type="number" value="${set.reps||''}" placeholder="—"
                 oninput="updateReps('${esc(ex.name)}',${si},this.value)">
               <button class="check-btn ${set.done?'done':''}" onclick="toggleSet('${esc(ex.name)}',${si})">✓</button>
@@ -557,7 +566,7 @@ function renderWorkout(){
           </div>
           ${lastH?`
             <div class="last-session">
-              <div><div class="last-wt">${lastH.weight}kg</div><div class="last-meta">${lastH.sets} sets done</div></div>
+              <div><div class="last-wt">${lastH.weight}lb</div><div class="last-meta">${lastH.sets} sets done</div></div>
               <div class="last-date">${lastH.date}</div>
             </div>`:''}
         </div>
@@ -574,7 +583,16 @@ function toggleCard(i,name){
   openCards[key]=openCards[key]===false;
   document.getElementById('card'+i).classList.toggle('open');
 }
-function updateWeight(name,val){getExData(currentDay,name,1).weight=val;debounceSave();}
+function updateSetWeight(name,si,val){
+  const ed=getExData(currentDay,name,si+1);
+  ed.sets[si].weight=val;
+  debounceSave();
+}
+function topWeight(ed){
+  if(!ed.sets||ed.sets.length===0)return '';
+  const ws=ed.sets.map(s=>parseFloat(s.weight)||0).filter(w=>w>0);
+  return ws.length?Math.max(...ws):'';
+}
 function updateReps(name,si,val){
   const ed=getExData(currentDay,name,si+1);
   ed.sets[si].reps=val;
@@ -665,7 +683,7 @@ function resetDay(){
   if(!confirm('Reset all sets for '+currentDay+'?'))return;
   (split[currentDay]||[]).forEach(ex=>{
     const ed=getExData(currentDay,ex.name,ex.sets);
-    ed.sets=makeSets(ex.sets);
+    ed.sets=ed.sets.map(s=>({weight:s.weight||'',reps:'',done:false}));
   });
   debounceSave();
   showToast('Day reset');
@@ -682,13 +700,13 @@ async function finishWorkout(){
     if(doneCount>0){
       anyDone=true;
       if(!ed.history)ed.history=[];
-      ed.history.push({date:today,weight:ed.weight||0,sets:doneCount,allCompleted:doneCount===ex.sets});
+      ed.history.push({date:today,weight:topWeight(ed)||0,sets:doneCount,allCompleted:doneCount===ex.sets});
       if(ed.history.length>10)ed.history.shift();
     }
   });
   if(!anyDone){showToast('Check off some sets first');return;}
 
-  // Auto progression: top of range on all sets → +2.5kg immediately
+  // Auto progression: top of range on all sets → +5lb immediately
   const progressed=evaluateProgression(currentDay);
 
   // Log the workout date for the calendar
@@ -702,7 +720,7 @@ async function finishWorkout(){
     const ed=getExData(currentDay,ex.name,ex.sets);
     const doneCount=ed.sets.filter(s=>s.done).length;
     if(doneCount>0){
-      dayLog.exercises.push({name:ex.name,weight:ed.weight||0,setsDone:doneCount,totalSets:ex.sets,allHit:doneCount===ex.sets});
+      dayLog.exercises.push({name:ex.name,weight:topWeight(ed)||0,setsDone:doneCount,totalSets:ex.sets,allHit:doneCount===ex.sets});
     }
   });
   const existing=weekEntry.days.findIndex(d=>d.day===currentDay);
@@ -710,7 +728,7 @@ async function finishWorkout(){
   else weekEntry.days.push(dayLog);
 
   await saveAll();
-  showToast(progressed.length>0?'✓ Saved! +2.5kg on '+progressed.length+' lift'+(progressed.length>1?'s':'')+' 🔺':'✓ Workout saved!');
+  showToast(progressed.length>0?'✓ Saved! +5lb on '+progressed.length+' lift'+(progressed.length>1?'s':'')+' 🔺':'✓ Workout saved!');
   renderWorkout();
   renderHistory();
   renderCalendar();
@@ -784,7 +802,7 @@ function renderHistory(){
             ${d.exercises.map(ex=>`
               <div class="hist-ex-row">
                 <div class="hist-ex-name">${ex.name}</div>
-                <div class="hist-ex-stat">${ex.weight}kg · ${ex.setsDone||ex.sets}/${ex.totalSets} ${ex.allHit?'✓':''}</div>
+                <div class="hist-ex-stat">${ex.weight}lb · ${ex.setsDone||ex.sets}/${ex.totalSets} ${ex.allHit?'✓':''}</div>
               </div>`).join('')}
           </div>`).join('')}
       </div>
@@ -802,4 +820,3 @@ init();
 </script>
 </body>
 </html>
-
